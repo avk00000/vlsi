@@ -1,21 +1,44 @@
+----------------------------------------------------------------------------------
+-- Company: 
+-- Engineer: 
+-- 
+-- Create Date:    19:57:44 11/11/2025 
+-- Design Name: 
+-- Module Name:    FIFO_D - Behavioral 
+-- Project Name: 
+-- Target Devices: 
+-- Tool versions: 
+-- Description: 
+--
+-- Dependencies: 
+--
+-- Revision: 
+-- Revision 0.01 - File Created
+-- Additional Comments: 
+--
+----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
-entity fifo is
-    Port (
-        clk     : in  STD_LOGIC;
-        reset   : in  STD_LOGIC;
-        WriteEn : in  STD_LOGIC;
-        DataIn  : in  STD_LOGIC_VECTOR(1 downto 0);
-        ReadEn  : in  STD_LOGIC;
-        DataOut : out STD_LOGIC_VECTOR(1 downto 0);
-        Empty   : out STD_LOGIC;
-        Full    : out STD_LOGIC
-    );
-end fifo;
+---- Uncomment the following library declaration if instantiating
+---- any Xilinx primitives in this code.
+--library UNISIM;
+--use UNISIM.VComponents.all;
 
-architecture Behavioral of fifo is
+entity FIFO_D is
+    Port ( clk : in  STD_LOGIC;
+           reset : in  STD_LOGIC;
+           WriteEn : in  STD_LOGIC;
+           DataIn : in  STD_LOGIC_VECTOR (1 downto 0);
+           ReadEn : in  STD_LOGIC;
+           DataOut : out  STD_LOGIC_VECTOR (1 downto 0);
+           Empty : out  STD_LOGIC;
+           Full : out  STD_LOGIC);
+end FIFO_D;
+
+architecture Behavioral of FIFO_D is
 
     constant FIFO_DEPTH : natural := 4; -- example depth
     type FIFO_Memory is array (0 to FIFO_DEPTH-1) of STD_LOGIC_VECTOR(1 downto 0);
@@ -84,5 +107,6 @@ begin
 
         end if;
     end process;
+
 
 end Behavioral;
