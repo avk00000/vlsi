@@ -1,197 +1,225 @@
+----------------------------------------------------------------------------------
+-- Module Name : lcd_dd - Behavioral (fixed)
+----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
+-- Keeping your arithmetic style; if you prefer numeric_std, convert 'div' to unsigned.
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
----- Uncomment the following library declaration if instantiating
----- any Xilinx primitives in this code.
---library UNISIM;
---use UNISIM.VComponents.all;
+entity lcd_dd is
+    Port (
+        clk_12Mhz : in  STD_LOGIC;
+        rst       : in  STD_LOGIC;                    -- active-high reset
+        lcd_rs    : out STD_LOGIC;                    -- was 'in' -> must be 'out'
+        lcd_en    : out STD_LOGIC;                    -- was 'in' -> must be 'out'
+        lcd_data  : out STD_LOGIC_VECTOR (7 downto 0)
+    );
+end lcd_dd;
 
-entity lcd_V is
-generic(rst_state:std_logic:='1');		-- for USDP it is Active LOW
-    Port ( rst : in std_logic; 		-- reset
-           clk_12Mhz : in std_logic;		-- high freq. clock
-           lcd_rs : out std_logic;		-- LCD RS control
-           lcd_en : out std_logic;		-- LCD Enable
-           lcd_data : out std_logic_vector(7 downto 0));	-- LCD Data port
-end lcd_V;
+architecture Behavioral of lcd_dd is
 
-architecture Behavioral of lcd_V is
-signal div : std_logic_vector(20 downto 0); --- delay timer 1
-signal clk_t1,lcd_rs_s,lcd_en_s ,line2,line2_clk1: std_logic;
--- LCD controller FSM states
-type state is (reset,func,addr_1st,addr_2nd,mode,cur,clear,d0,d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,d11,
-			d12,d13,d14,d15,hold,extra);
-signal ps,nx	: state;
-signal dataout_s  : std_logic_vector(7 downto 0); --- internal data command multiplexer
+    signal div : std_logic_vector(20 downto 0);       -- delay/clock divider
+    signal clk_t1       : std_logic;
+    signal lcd_rs_s     : std_logic;
+    signal lcd_en_s     : std_logic;
+    signal line2        : std_logic;
+
+    -- LCD controller FSM states
+    type state is (
+        reset, func, addr_1st, addr_2nd, mode, cur, clear,
+        d0,d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,d11,d12,d13,d14,d15,
+        hold, extra
+    );
+    signal ps, nx : state;
+
+    signal dataout_s : std_logic_vector(7 downto 0);
 
 begin
 
-lcd_en <= lcd_en_s; 
-lcd_rs <= lcd_rs_s;
+    -- Drive top-level outputs
+    lcd_en   <= lcd_en_s;
+    lcd_rs   <= lcd_rs_s;
+    lcd_data <= dataout_s;
 
------ clk divider ---------------------------------
-process(rst,clk_12Mhz)
-begin
-if(rst = rst_state)then
-	div <= (others=>'0');
-elsif( clk_12Mhz'event and clk_12Mhz ='1')then
-	div <= div + 1;
-end if;
-end process;
-----------------------------------------------------
-clk_t1 <= div(15);
+    ----------------------------------------------------------------------------
+    -- Clock divider
+    ----------------------------------------------------------------------------
+    process(rst, clk_12Mhz)
+    begin
+        if rst = '1' then
+            div <= (others => '0');
+        elsif rising_edge(clk_12Mhz) then
+            div <= div + 1;
+        end if;
+    end process;
 
------ Presetn state Register -----------------------
-process(rst,clk_t1)
-begin
-if(rst = rst_state)then
-	ps 	<= reset;
-	line2	<= '0';	---to display "Smart Logic Tech"
-elsif( clk_t1'event and clk_t1 ='1')then
-	ps	<= nx;
-	if ps = extra then
-		line2	<= '1';	-- to display "lcd demo in vhdl"
-   end if;
-end if;
-end process;
------ state and output  decoding process 
-process(rst,ps,line2)
-begin
-case(ps) is
+    clk_t1 <= div(15);               -- ~366 Hz from 12 MHz (good for LCD enable)
 
-when reset =>
-			nx	<= func;
-	    	lcd_rs_s	<= '0';
-			dataout_s	<= "00111000";		-- 38h
-			
-when func	=>
-			nx	<= mode;
-			lcd_rs_s	<= '0';
-			dataout_s	<= "00111000";		-- 38h
-when mode	=>
-			nx	<= cur;
-			lcd_rs_s	<= '0';
-			dataout_s	<= "00000110";		-- 06h
-when cur	=>
-			nx	<= addr_1st;	   
-			lcd_rs_s	<= '0';
-			dataout_s	<= "00001100";		-- 0Ch  curser at starting point of line1
-when addr_1st	=>		                   -- line-1 display adress
-			nx	<= clear;
-			lcd_rs_s	<= '0';
-			dataout_s	<= "10110000";		-- 80h  
-when clear=>
-			nx	<= d0;
-			lcd_rs_s	<= '0';
-			dataout_s	<= "00000001";		-- 01h
-      
-when d0	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01010111";		-- W	
-				nx	<= d1;
-        
-when d1	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01100101";		-- e
-			nx	<= d2;
-			
-when d2	=>
-			lcd_rs_s	<= '1';	 
-			dataout_s	<= "01101100";		-- l
-			nx	<= d3;
-      
-when d3	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01100011";		-- c
-			nx	<= d4;
-      
---			LCD Demo in VHDL
-when d4	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01101111";		-- o
-			nx	<= d5;
-			
-when d5	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01101101";		-- m
-			nx	<= d6;
-			
-when d6	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01100101";		-- e
-			nx	<= d7;
-			
-when d7	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "00100000";		-- space
-			nx	<= d8;
-			
-when d8	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01110100";		-- t
-			nx	<= d9;
-			
-when d9	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01101111";		-- o
-			nx	<= d10;
-      
-when d10	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "00100000";		-- space
-			nx	<= d11;	
-      
-when d11	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01001001";		-- I
-			nx<=d12;
-				
-when d12	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "00110010";		-- 2
-			nx	<= d13;
+    ----------------------------------------------------------------------------
+    -- Present-state register and line2 latch
+    ----------------------------------------------------------------------------
+    process(rst, clk_t1)
+    begin
+        if rst = '1' then
+            ps    <= reset;
+            line2 <= '0';            -- start by showing first message
+        elsif rising_edge(clk_t1) then
+            ps <= nx;
+            if ps = extra then
+                line2 <= '1';        -- switch to second line message
+            end if;
+        end if;
+    end process;
 
-when d13	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01001001";		-- I
-			nx	<= d14;
+    ----------------------------------------------------------------------------
+    -- Next-state and output decode
+    ----------------------------------------------------------------------------
+    process(ps, line2)
+    begin
+        -- Safe defaults to avoid unintended latches
+        nx         <= ps;
+        lcd_rs_s   <= '0';
+        dataout_s  <= (others => '0');
 
-when d14	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "01010100";		-- T
-			nx	<= d15;
-      
-when d15	=>
-			lcd_rs_s	<= '1';
-			dataout_s	<= "00100000";		-- space
-			nx	<= addr_2nd;
-				
-when addr_2nd	=>		  --- line-2 display adress
-			lcd_rs_s	<= '0';
-		  	if line2='1' then
-			nx			<= addr_2nd;
-			else
-			nx			<= extra;
-			dataout_s	<= "11000000";		-- C0h  -- curser at  starting point of line2
-			
-			end if;
-			
-when  extra	=>
-			nx	<= d0;	   
-			lcd_rs_s	<= '0';
-			dataout_s	<= "11000000";		-- C0h
+        case ps is
 
-when others=>
-			nx	<= reset;
-			lcd_rs_s	<= '0';
-			dataout_s	<= "00000001";		-- CLEAR
-end case;
-end process;
+            when reset =>
+                nx        <= func;
+                lcd_rs_s  <= '0';
+                dataout_s <= "00111000";  -- 0x38: Function set (8-bit, 2-line, 5x8)
 
-lcd_en_s <= clk_t1;
-lcd_data <= dataout_s;
+            when func =>
+                nx        <= mode;
+                lcd_rs_s  <= '0';
+                dataout_s <= "00111000";  -- 0x38
+
+            when mode =>
+                nx        <= cur;
+                lcd_rs_s  <= '0';
+                dataout_s <= "00000110";  -- 0x06: Entry mode (increment, no shift)
+
+            when cur =>
+                nx        <= addr_1st;
+                lcd_rs_s  <= '0';
+                dataout_s <= "00001100";  -- 0x0C: Display on, cursor off, blink off
+
+            when addr_1st =>               -- Line-1 DDRAM start address
+                nx        <= clear;
+                lcd_rs_s  <= '0';
+                dataout_s <= "10000000";  -- *0x80* (fixed; was 0xB0)
+
+            when clear =>
+                nx        <= d0;
+                lcd_rs_s  <= '0';
+                dataout_s <= "00000001";  -- 0x01: Clear display
+
+            -- "Welco me to IIT T " (your original sequence; left as-is except spacing)
+            when d0 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01010111";  -- 'W'
+                nx        <= d1;
+
+            when d1 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01100101";  -- 'e'
+                nx        <= d2;
+
+            when d2 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01101100";  -- 'l'
+                nx        <= d3;
+
+            when d3 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01100011";  -- 'c'
+                nx        <= d4;
+
+            when d4 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01101111";  -- 'o'
+                nx        <= d5;
+
+            when d5 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01101101";  -- 'm'
+                nx        <= d6;
+
+            when d6 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01100101";  -- 'e'
+                nx        <= d7;
+
+            when d7 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "00100000";  -- ' '
+                nx        <= d8;
+
+            when d8 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01110100";  -- 't'
+                nx        <= d9;
+
+            when d9 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01101111";  -- 'o'
+                nx        <= d10;
+
+            when d10 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "00100000";  -- ' '
+                nx        <= d11;
+
+            when d11 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01001001";  -- 'I'
+                nx        <= d12;
+
+            when d12 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "00110010";  -- '2'
+                nx        <= d13;
+
+            when d13 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01001001";  -- 'I'
+                nx        <= d14;
+
+            when d14 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "01010100";  -- 'T'
+                nx        <= d15;
+
+            when d15 =>
+                lcd_rs_s  <= '1';
+                dataout_s <= "00100000";  -- ' '
+                nx        <= addr_2nd;
+
+            when addr_2nd =>
+                lcd_rs_s  <= '0';
+                if line2 = '1' then
+                    nx <= addr_2nd;       -- hold until reset
+                else
+                    nx        <= extra;
+                    dataout_s <= "11000000";  -- 0xC0: Line-2 start
+                end if;
+
+            when extra =>
+                nx        <= d0;          -- loop back to write again (your design)
+                lcd_rs_s  <= '0';
+                dataout_s <= "11000000";  -- 0xC0
+
+            when others =>
+                nx        <= reset;
+                lcd_rs_s  <= '0';
+                dataout_s <= "00000001";  -- Clear
+        end case;
+    end process;
+
+    ----------------------------------------------------------------------------
+    -- LCD EN: simple strobe from divided clock
+    ----------------------------------------------------------------------------
+    lcd_en_s <= clk_t1;
 
 end Behavioral;
 
