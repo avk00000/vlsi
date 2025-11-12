@@ -34,7 +34,7 @@ entity shiftreg_d is
            sel : in  STD_LOGIC_VECTOR (1 downto 0);
            sl_in : in  STD_LOGIC;
            sr_in : in  STD_LOGIC;
-           dataout : in  STD_LOGIC_VECTOR (3 downto 0));
+           dataout : out STD_LOGIC_VECTOR (3 downto 0));
 end shiftreg_d;
 
 architecture Behavioral of shiftreg_d is
@@ -56,5 +56,6 @@ begin
         end if;
     end process;
 
+    dataout <= temp;
 
 end Behavioral;
